@@ -1,6 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import { Pool } from 'pg';
-import { pool } from '../config/database';
+import { pool, query as dbQuery } from '../config/database';
+// Pool is used in the function signature for logAuditEvent
+void (Pool as unknown); // suppress unused warning
 import { logger } from '../utils/logger';
 import { v4 as uuidv4 } from 'uuid';
 import { AuditLogEntry } from '../types';
@@ -170,13 +172,13 @@ export async function getAuditLogs(
 
   const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
-  const [countRow] = await pool.query<{ count: string }>(
+  const countRows = await dbQuery<{ count: string }>(
     `SELECT COUNT(*) AS count FROM audit_logs al ${where}`,
     params
   );
-  const total = parseInt(countRow?.count ?? '0', 10);
+  const total = parseInt(countRows[0]?.count ?? '0', 10);
 
-  const rows = await pool.query<AuditLogEntry>(
+  const logs = await dbQuery<AuditLogEntry>(
     `SELECT
        al.id, al.user_id AS "userId", al.action, al.resource,
        al.resource_id AS "resourceId", al.ip_address AS "ipAddress",
@@ -190,5 +192,5 @@ export async function getAuditLogs(
     [...params, limit, offset]
   );
 
-  return { logs: rows.rows, total };
+  return { logs, total };
 }
